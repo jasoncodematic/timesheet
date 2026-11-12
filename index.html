@@ -1,0 +1,1905 @@
+<!DOCTYPE html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#16303F">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Timesheet">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="A simple timesheet that reads and writes a Google Sheet.">
+  <title>Timesheet Prototype</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2316303F'/%3E%3Crect x='6' y='8' width='20' height='18' rx='3' fill='%230f7a6c'/%3E%3Crect x='8' y='12' width='16' height='12' rx='2' fill='%23f4f1eb'/%3E%3Crect x='8' y='12' width='16' height='3.5' fill='%2316303F'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --ink: #16303f;
+      --ink-soft: #3d5560;
+      --accent: #0f7a6c;
+      --accent-hover: #0c655a;
+      --accent-soft: #e6f4f2;
+      --paper: #f4f1eb;
+      --card: #ffffff;
+      --line: #d9d3c9;
+      --danger: #b42318;
+      --danger-soft: #fdecea;
+      --warn: #8a5a00;
+      --warn-bg: #fff6e0;
+      --warn-line: #efd59a;
+      --muted: #6b7280;
+      --inactive: #8a959b;
+      --shadow: 0 1px 2px rgba(22, 48, 63, 0.06), 0 8px 24px rgba(22, 48, 63, 0.06);
+      --radius: 14px;
+      --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.45;
+      min-height: 100vh;
+      padding-bottom: calc(24px + var(--safe-bottom));
+    }
+
+    .app {
+      max-width: 40rem;
+      margin: 0 auto;
+      padding: 0 16px 32px;
+    }
+
+    header.app-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: calc(14px + var(--safe-top)) 0 12px;
+      background: color-mix(in srgb, var(--paper) 92%, transparent);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid transparent;
+    }
+
+    header.app-header h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+
+    header.app-header p.sub {
+      margin: 2px 0 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+      max-width: 16rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    button, input, textarea {
+      font: inherit;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      background: none;
+      cursor: pointer;
+      color: inherit;
+    }
+
+    .icon-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink);
+      background: var(--card);
+      border: 1px solid var(--line);
+      flex: 0 0 auto;
+    }
+    .icon-btn:hover, .icon-btn:focus-visible {
+      border-color: var(--accent);
+      outline: none;
+    }
+
+    .banner {
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin: 12px 0 0;
+      font-size: 0.92rem;
+      border: 1px solid var(--warn-line);
+      background: var(--warn-bg);
+      color: var(--ink);
+    }
+    .banner strong { color: var(--warn); }
+    .banner.error {
+      background: var(--danger-soft);
+      border-color: #f0c2be;
+      color: #7a160f;
+    }
+    .banner.signin {
+      background: var(--accent-soft);
+      border-color: #b7ddd8;
+    }
+    .banner.signin strong { color: var(--accent-hover); }
+    .banner a, .banner button.link {
+      color: var(--accent);
+      text-decoration: underline;
+      padding: 0;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    form.add-form h2,
+    .list-head h2 {
+      margin: 0 0 12px;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-soft);
+    }
+
+    label.field {
+      display: block;
+      margin-bottom: 10px;
+    }
+    label.field span {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--ink-soft);
+    }
+    input[type="date"],
+    input[type="url"],
+    input[type="text"],
+    input[type="password"],
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--ink);
+    }
+    input:focus, textarea:focus {
+      outline: 2px solid color-mix(in srgb, var(--accent) 45%, white);
+      border-color: var(--accent);
+    }
+    textarea { resize: vertical; min-height: 4.5rem; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 42px;
+      padding: 0 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: 1px solid transparent;
+    }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-ghost {
+      background: var(--card);
+      border-color: var(--line);
+      color: var(--ink);
+    }
+    .btn-danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+    .btn-text {
+      min-height: 36px;
+      padding: 0 8px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .btn-text.danger { color: var(--danger); }
+    .btn-signin {
+      min-height: 42px;
+      white-space: nowrap;
+    }
+
+    .list-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 24px;
+      margin-bottom: 4px;
+    }
+    .list-head h2 { margin: 0; }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+      user-select: none;
+    }
+    .toggle input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    .empty, .loading {
+      text-align: center;
+      color: var(--muted);
+      padding: 28px 12px;
+      font-size: 0.95rem;
+    }
+
+    .entry {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      margin-top: 10px;
+      position: relative;
+    }
+    .entry.inactive {
+      background: #f3f1ed;
+      box-shadow: none;
+      opacity: 0.78;
+    }
+    .entry.inactive .desc { color: var(--inactive); text-decoration: line-through; }
+    .entry.syncing {
+      opacity: 0.72;
+    }
+    .entry .when {
+      font-size: 0.8rem;
+      font-weight: 650;
+      color: var(--accent);
+      letter-spacing: 0.01em;
+    }
+    .entry.inactive .when { color: var(--inactive); }
+    .entry .desc {
+      margin: 6px 0 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 1.02rem;
+    }
+    .entry .meta {
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .entry .sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+    .entry .sync-badge::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 1s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 1; }
+    }
+    .entry .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    .toast-wrap {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: calc(16px + var(--safe-bottom));
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 40;
+      padding: 0 16px;
+    }
+    .toast {
+      pointer-events: auto;
+      background: var(--ink);
+      color: #fff;
+      border-radius: 999px;
+      padding: 10px 10px 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow);
+      font-size: 0.92rem;
+      max-width: 40rem;
+    }
+    .toast button {
+      color: #8ee0d4;
+      font-weight: 700;
+      padding: 6px 10px;
+    }
+    .toast.error {
+      background: #7a160f;
+      border-radius: 16px;
+    }
+    .toast.error button { color: #ffd7d3; }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(22, 48, 63, 0.45);
+      z-index: 30;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .overlay[hidden] { display: none; }
+    .sheet {
+      background: var(--card);
+      width: 100%;
+      max-width: 40rem;
+      max-height: min(92vh, 40rem);
+      overflow: auto;
+      border-radius: 18px 18px 0 0;
+      padding: 16px 16px calc(20px + var(--safe-bottom));
+    }
+    .sheet h2 { margin: 4px 0 6px; font-size: 1.15rem; }
+    .sheet .hint {
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin: 0 0 14px;
+    }
+    .sheet-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.86em;
+    }
+
+    @media (min-width: 640px) {
+      .overlay { align-items: center; padding: 24px; }
+      .sheet { border-radius: 18px; }
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div>
+        <h1>Timesheet</h1>
+        <p class="sub" id="mode-label">Demo mode</p>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="btn btn-ghost btn-signin" id="auth-button" hidden>Sign in</button>
+        <button type="button" class="icon-btn" id="open-settings" aria-label="Open settings" title="Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="demo-banner" class="banner" role="status">
+      <strong>Demo mode.</strong> Entries stay in this browser only and are not written to the Google Sheet. Open Settings to add your OAuth Client ID when you are ready to connect.
+    </div>
+
+    <div id="signin-banner" class="banner signin" hidden role="status">
+      <strong>Sign in to connect.</strong> The Google account you use must have access to the timesheet spreadsheet.
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="signin-banner-button">Sign in with Google</button>
+      </div>
+    </div>
+
+    <div id="error-banner" class="banner error" hidden role="alert"></div>
+
+    <form class="card add-form" id="add-form">
+      <h2>New entry</h2>
+      <label class="field">
+        <span>Date</span>
+        <input type="date" id="add-date" required>
+      </label>
+      <label class="field">
+        <span>Description</span>
+        <textarea id="add-description" required placeholder="What did you work on?" maxlength="2000"></textarea>
+      </label>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary" id="add-submit">Add entry</button>
+      </div>
+    </form>
+
+    <div class="list-head">
+      <h2>Entries</h2>
+      <label class="toggle">
+        <input type="checkbox" id="show-inactive">
+        Show inactive
+      </label>
+    </div>
+    <div id="entry-list" aria-live="polite"></div>
+  </div>
+
+  <div class="toast-wrap" id="toast-wrap" hidden>
+    <div class="toast" id="toast" role="status">
+      <span id="toast-message">Entry deleted</span>
+      <button type="button" id="toast-action">Undo</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="settings-overlay" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="sheet-top">
+        <h2 id="settings-title">Settings</h2>
+        <button type="button" class="btn btn-ghost" id="close-settings">Close</button>
+      </div>
+      <p class="hint">Paste your Google OAuth Client ID and the spreadsheet ID (or the full sheet URL). Leave either blank, or choose Use demo mode, to keep entries in this browser only. You can also hardcode the defaults at the top of this file before publishing.</p>
+      <form id="settings-form">
+        <label class="field">
+          <span>OAuth Client ID</span>
+          <input type="text" id="settings-client-id" placeholder="123456789-abc.apps.googleusercontent.com" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Spreadsheet ID or URL</span>
+          <input type="text" id="settings-spreadsheet-id" placeholder="1Kqn2XAPOD-R3O1TzVFMo8wT9q8FidRf2mjVdQqGdzlE" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">Save settings</button>
+          <button type="button" class="btn btn-ghost" id="use-demo">Use demo mode</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+(function () {
+  'use strict';
+
+  // Hardcode these before publishing if you want Settings to be pre-filled.
+  // Leave DEFAULT_CLIENT_ID blank to configure it in the app after deploy.
+  var DEFAULT_CLIENT_ID = '';
+  var DEFAULT_SPREADSHEET_ID = '1Kqn2XAPOD-R3O1TzVFMo8wT9q8FidRf2mjVdQqGdzlE';
+
+  var SETTINGS_KEY = 'timesheet-v2-settings';
+  var DEMO_KEY = 'timesheet-v2-demo-entries';
+  var CACHE_KEY = 'timesheet-v2-cache';
+  var SHOW_INACTIVE_KEY = 'timesheet-v2-show-inactive';
+  var EMAIL_HINT_KEY = 'timesheet-v2-email-hint';
+
+  var SHEET_NAME = 'Entries';
+  var HEADERS = ['id', 'date', 'description', 'active', 'createdAt', 'updatedAt'];
+  // spreadsheets is required to open an existing sheet by ID. drive.file only
+  // covers files this app created or that the user opened with the Picker, so
+  // it would not reach the existing Timesheet Prototype spreadsheet.
+  // userinfo.email is a non-sensitive scope used only to show who is signed in
+  // and to hint the account on the next silent token request.
+  var SCOPE = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email';
+  var SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
+  var USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
+  var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  var TOKEN_EXPIRY_BUFFER_MS = 60000;
+
+  var fetchFn = typeof fetch === 'function' ? fetch : null;
+
+  var state = {
+    entries: [],
+    rowMap: {},
+    loading: false,
+    error: '',
+    undo: null,
+    accessToken: '',
+    tokenExpiresAt: 0,
+    email: '',
+    client: null
+  };
+  var tokenClient = null;
+  var tokenClientId = '';
+  var toastTimer = null;
+  var opChains = {};
+  var opGens = {};
+
+  function todayLocal() {
+    var d = new Date();
+    return toIsoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  }
+
+  function toIsoDate(y, m, d) {
+    return String(y) + '-' + pad(m) + '-' + pad(d);
+  }
+
+  function pad(n) {
+    return String(n).padStart(2, '0');
+  }
+
+  function nowIso() {
+    var d = new Date();
+    var offset = -d.getTimezoneOffset();
+    var sign = offset >= 0 ? '+' : '-';
+    var abs = Math.abs(offset);
+    return toIsoDate(d.getFullYear(), d.getMonth() + 1, d.getDate()) +
+      'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) +
+      sign + pad(Math.floor(abs / 60)) + ':' + pad(abs % 60);
+  }
+
+  function uuid() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      var buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      buf[6] = (buf[6] & 0x0f) | 0x40;
+      buf[8] = (buf[8] & 0x3f) | 0x80;
+      var hex = Array.prototype.map.call(buf, function (b) {
+        return b.toString(16).padStart(2, '0');
+      }).join('');
+      return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function validateDate(date) {
+    var s = String(date || '').trim();
+    if (!DATE_RE.test(s)) throw new Error('date must be YYYY-MM-DD');
+    var parts = s.split('-');
+    var y = Number(parts[0]);
+    var m = Number(parts[1]);
+    var d = Number(parts[2]);
+    var dt = new Date(Date.UTC(y, m - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+      throw new Error('date must be a valid calendar date (YYYY-MM-DD)');
+    }
+    return s;
+  }
+
+  function validateDescription(description) {
+    var s = String(description || '').trim();
+    if (!s) throw new Error('description is required');
+    return s;
+  }
+
+  function formatDisplayDate(isoDate) {
+    var parts = String(isoDate || '').split('-');
+    if (parts.length !== 3) return String(isoDate || '');
+    var dt = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    if (isNaN(dt.getTime())) return String(isoDate || '');
+    return new Intl.DateTimeFormat('en-NZ', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).format(dt);
+  }
+
+  function compareEntries(a, b) {
+    if (a.date !== b.date) return String(b.date).localeCompare(String(a.date));
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+  }
+
+  function cloneEntry(entry) {
+    return entry ? Object.assign({}, entry) : entry;
+  }
+
+  function cloneEntries(entries) {
+    return (entries || []).map(cloneEntry);
+  }
+
+  function parseSpreadsheetId(input) {
+    var s = String(input || '').trim();
+    var match = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (match) return match[1];
+    return s;
+  }
+
+  function getSettings() {
+    try {
+      var raw = localStorage.getItem(SETTINGS_KEY);
+      var parsed = raw ? JSON.parse(raw) : {};
+      var storedClient = String((parsed && parsed.clientId) || '').trim();
+      var storedSheet = parseSpreadsheetId((parsed && parsed.spreadsheetId) || '');
+      return {
+        clientId: storedClient || DEFAULT_CLIENT_ID,
+        spreadsheetId: storedSheet || DEFAULT_SPREADSHEET_ID,
+        forceDemo: !!(parsed && parsed.forceDemo)
+      };
+    } catch (err) {
+      return {
+        clientId: DEFAULT_CLIENT_ID,
+        spreadsheetId: DEFAULT_SPREADSHEET_ID,
+        forceDemo: false
+      };
+    }
+  }
+
+  function saveSettings(settings) {
+    var next = {
+      clientId: String((settings && settings.clientId) || '').trim(),
+      spreadsheetId: parseSpreadsheetId((settings && settings.spreadsheetId) || ''),
+      forceDemo: !!(settings && settings.forceDemo)
+    };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+    return getSettings();
+  }
+
+  function isConfigured(settings) {
+    var s = settings || getSettings();
+    return !!(s.clientId && s.spreadsheetId);
+  }
+
+  function isDemoMode(settings) {
+    var s = settings || getSettings();
+    return !!s.forceDemo || !isConfigured(s);
+  }
+
+  function isSignedIn() {
+    return !!(state.accessToken && Date.now() < state.tokenExpiresAt);
+  }
+
+  function readDemoEntries() {
+    try {
+      var raw = localStorage.getItem(DEMO_KEY);
+      if (!raw) {
+        var seeded = seedDemoEntries();
+        localStorage.setItem(DEMO_KEY, JSON.stringify(seeded));
+        return seeded.slice();
+      }
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function writeDemoEntries(entries) {
+    localStorage.setItem(DEMO_KEY, JSON.stringify(entries));
+  }
+
+  function seedDemoEntries() {
+    var now = nowIso();
+    return [
+      {
+        id: 'demo-sample-2',
+        date: todayLocal(),
+        description: 'SAMPLE — Trying the prototype in demo mode',
+        active: true,
+        createdAt: now,
+        updatedAt: now
+      },
+      {
+        id: 'demo-sample-1',
+        date: '2026-11-10',
+        description: 'SAMPLE — Morning standup notes',
+        active: true,
+        createdAt: '2026-11-10T09:15:00+13:00',
+        updatedAt: '2026-11-10T09:15:00+13:00'
+      }
+    ];
+  }
+
+  function findIndex(entries, id) {
+    if (!id) throw new Error('id is required');
+    for (var i = 0; i < entries.length; i++) {
+      if (String(entries[i].id) === String(id)) return i;
+    }
+    return -1;
+  }
+
+  function upsertEntry(entries, entry) {
+    var next = cloneEntries(entries);
+    var index = findIndex(next, entry.id);
+    if (index < 0) next.push(entry);
+    else next[index] = Object.assign({}, next[index], entry);
+    next.sort(compareEntries);
+    return next;
+  }
+
+  function removeEntry(entries, id) {
+    return (entries || []).filter(function (entry) {
+      return String(entry.id) !== String(id);
+    });
+  }
+
+  function applyOptimistic(entries, nextEntry) {
+    var snapshot = cloneEntries(entries);
+    return {
+      entries: upsertEntry(entries, nextEntry),
+      rollback: snapshot
+    };
+  }
+
+  function rollbackEntries(snapshot) {
+    return cloneEntries(snapshot);
+  }
+
+  function serialToIsoDate(serial) {
+    var n = Number(serial);
+    if (!isFinite(n)) return '';
+    var epoch = Date.UTC(1899, 11, 30);
+    var ms = Math.round(n * 86400000);
+    var d = new Date(epoch + ms);
+    return toIsoDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  }
+
+  function parseCellDate(value) {
+    if (value == null || value === '') return '';
+    if (typeof value === 'number') return serialToIsoDate(value);
+    var s = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    if (/^-?\d+(\.\d+)?$/.test(s) && Number(s) > 20000) return serialToIsoDate(s);
+    return s;
+  }
+
+  function parseCellActive(value) {
+    if (value === true || value === 1) return true;
+    if (value === false || value === 0 || value === '') return false;
+    var s = String(value).trim().toLowerCase();
+    return s === 'true' || s === 'yes' || s === '1';
+  }
+
+  function parseCellTimestamp(value) {
+    if (value == null || value === '') return '';
+    if (typeof value === 'number') {
+      var epoch = Date.UTC(1899, 11, 30);
+      var d = new Date(epoch + Math.round(value * 86400000));
+      var offset = -d.getTimezoneOffset();
+      var sign = offset >= 0 ? '+' : '-';
+      var abs = Math.abs(offset);
+      return toIsoDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()) +
+        'T' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()) +
+        '+00:00';
+    }
+    return String(value);
+  }
+
+  function isHeaderRow(row) {
+    return String((row && row[0]) || '').trim().toLowerCase() === 'id';
+  }
+
+  function rowToEntry(row) {
+    row = row || [];
+    return {
+      id: String(row[0] || ''),
+      date: parseCellDate(row[1]),
+      description: String(row[2] || ''),
+      active: parseCellActive(row[3]),
+      createdAt: parseCellTimestamp(row[4]),
+      updatedAt: parseCellTimestamp(row[5])
+    };
+  }
+
+  function entryToRowValues(entry) {
+    return [
+      entry.id,
+      entry.date,
+      entry.description,
+      entry.active === true ? 'TRUE' : 'FALSE',
+      entry.createdAt || '',
+      entry.updatedAt || ''
+    ];
+  }
+
+  function parseSheetValues(values) {
+    var rows = values || [];
+    var start = 0;
+    var rowMap = {};
+    var entries = [];
+    if (rows.length && isHeaderRow(rows[0])) start = 1;
+    for (var i = start; i < rows.length; i++) {
+      var entry = rowToEntry(rows[i]);
+      if (!entry.id) continue;
+      rowMap[String(entry.id)] = i + 1;
+      entries.push(entry);
+    }
+    entries.sort(compareEntries);
+    return { entries: entries, rowMap: rowMap };
+  }
+
+  function parseUpdatedRange(updatedRange) {
+    var match = String(updatedRange || '').match(/![A-Z]+(\d+)/i);
+    return match ? Number(match[1]) : null;
+  }
+
+  function a1Range(fromRow, toRow, startCol, endCol) {
+    startCol = startCol || 'A';
+    endCol = endCol || 'F';
+    if (toRow == null) {
+      return SHEET_NAME + '!' + startCol + (fromRow == null ? '' : fromRow) + ':' + endCol + (fromRow == null ? '' : fromRow);
+    }
+    return SHEET_NAME + '!' + startCol + fromRow + ':' + endCol + toRow;
+  }
+
+  function valuesUrl(spreadsheetId, range, params) {
+    var url = SHEETS_API + '/' + encodeURIComponent(spreadsheetId) + '/values/' + encodeURIComponent(range);
+    var query = [];
+    Object.keys(params || {}).forEach(function (key) {
+      if (params[key] === undefined || params[key] === '') return;
+      query.push(encodeURIComponent(key) + '=' + encodeURIComponent(params[key]));
+    });
+    if (query.length) url += '?' + query.join('&');
+    return url;
+  }
+
+  function tryParseJson(text) {
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function sheetsError(data, httpStatus) {
+    var message = (data && data.error && (data.error.message || data.error.status)) ||
+      (data && data.error) ||
+      ('Request failed' + (httpStatus ? ' (' + httpStatus + ')' : ''));
+    var err = new Error(String(message));
+    err.status = httpStatus;
+    err.statusCode = data && data.error && data.error.code;
+    return err;
+  }
+
+  function createSheetClient(options) {
+    options = options || {};
+    var spreadsheetId = options.spreadsheetId;
+    var request = options.request;
+    var rowMap = options.rowMap || {};
+
+    function setRowMap(next) {
+      rowMap = next || {};
+      return rowMap;
+    }
+
+    function list() {
+      var url = valuesUrl(spreadsheetId, SHEET_NAME + '!A:F', {
+        valueRenderOption: 'UNFORMATTED_VALUE',
+        dateTimeRenderOption: 'SERIAL_NUMBER',
+        majorDimension: 'ROWS'
+      });
+      return request(url, { method: 'GET' }).then(function (data) {
+        var values = (data && data.values) || [];
+        if (!values.length) {
+          return ensureHeaders().then(function () {
+            setRowMap({});
+            return { entries: [], rowMap: {} };
+          });
+        }
+        var parsed = parseSheetValues(values);
+        setRowMap(parsed.rowMap);
+        return parsed;
+      });
+    }
+
+    function ensureHeaders() {
+      var url = valuesUrl(spreadsheetId, SHEET_NAME + '!A1:F1', {
+        valueInputOption: 'RAW'
+      });
+      return request(url, {
+        method: 'PUT',
+        body: JSON.stringify({ values: [HEADERS] })
+      });
+    }
+
+    function refreshMapAndFind(id) {
+      return list().then(function () {
+        var row = rowMap[String(id)];
+        if (!row) throw new Error('Entry not found');
+        return row;
+      });
+    }
+
+    function findRow(id) {
+      if (!id) return Promise.reject(new Error('id is required'));
+      var expected = rowMap[String(id)];
+      if (!expected) return refreshMapAndFind(id);
+      var url = valuesUrl(spreadsheetId, SHEET_NAME + '!A' + expected + ':A' + expected, {
+        valueRenderOption: 'UNFORMATTED_VALUE',
+        majorDimension: 'ROWS'
+      });
+      return request(url, { method: 'GET' }).then(function (data) {
+        var cell = data && data.values && data.values[0] && data.values[0][0];
+        if (String(cell) === String(id)) return expected;
+        return refreshMapAndFind(id);
+      });
+    }
+
+    function create(entry) {
+      var url = valuesUrl(spreadsheetId, SHEET_NAME + '!A:F', {
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS'
+      });
+      return request(url, {
+        method: 'POST',
+        body: JSON.stringify({ values: [entryToRowValues(entry)] })
+      }).then(function (data) {
+        var updatedRange = data && data.updates && data.updates.updatedRange;
+        var row = parseUpdatedRange(updatedRange);
+        if (row) rowMap[String(entry.id)] = row;
+        return { entry: entry, row: row };
+      });
+    }
+
+    function update(entry) {
+      return findRow(entry.id).then(function (row) {
+        var url = valuesUrl(spreadsheetId, a1Range(row), {
+          valueInputOption: 'USER_ENTERED'
+        });
+        return request(url, {
+          method: 'PUT',
+          body: JSON.stringify({ values: [entryToRowValues(entry)] })
+        }).then(function () {
+          rowMap[String(entry.id)] = row;
+          return { entry: entry, row: row };
+        });
+      });
+    }
+
+    return {
+      list: list,
+      create: create,
+      update: update,
+      findRow: findRow,
+      ensureHeaders: ensureHeaders,
+      getRowMap: function () { return rowMap; },
+      setRowMap: setRowMap
+    };
+  }
+
+  function readCache(spreadsheetId) {
+    try {
+      var raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || parsed.spreadsheetId !== spreadsheetId || !Array.isArray(parsed.entries)) return null;
+      return parsed;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function writeCache(spreadsheetId, entries, rowMap) {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        spreadsheetId: spreadsheetId,
+        entries: entries,
+        rowMap: rowMap || {},
+        savedAt: nowIso()
+      }));
+    } catch (err) {
+      // Storage may be full or blocked; ignore.
+    }
+  }
+
+  function clearCache() {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  function waitForGis(timeoutMs) {
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+      return Promise.resolve();
+    }
+    return new Promise(function (resolve, reject) {
+      var started = Date.now();
+      var timer = setInterval(function () {
+        if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+          clearInterval(timer);
+          resolve();
+        } else if (Date.now() - started > (timeoutMs || 10000)) {
+          clearInterval(timer);
+          reject(new Error('Google sign-in script did not load. Check your network and that this page is served over http:// or https://, not as a local file.'));
+        }
+      }, 50);
+    });
+  }
+
+  function ensureTokenClient() {
+    var clientId = getSettings().clientId;
+    if (!clientId) return Promise.reject(new Error('OAuth Client ID is not set. Open Settings to add it.'));
+    return waitForGis().then(function () {
+      if (tokenClient && tokenClientId === clientId) return tokenClient;
+      tokenClientId = clientId;
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: SCOPE,
+        callback: function () {}
+      });
+      return tokenClient;
+    });
+  }
+
+  function requestToken(interactive) {
+    return ensureTokenClient().then(function (client) {
+      return new Promise(function (resolve, reject) {
+        client.callback = function (resp) {
+          if (resp && resp.error) {
+            var err = new Error(resp.error_description || resp.error);
+            err.code = resp.error;
+            reject(err);
+            return;
+          }
+          state.accessToken = resp.access_token;
+          state.tokenExpiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+          resolve(resp.access_token);
+        };
+        var opts = {};
+        if (interactive) {
+          opts.prompt = 'select_account';
+        } else {
+          opts.prompt = '';
+        }
+        var hint = '';
+        try { hint = localStorage.getItem(EMAIL_HINT_KEY) || state.email || ''; } catch (err) { hint = state.email || ''; }
+        if (hint) opts.hint = hint;
+        try {
+          client.requestAccessToken(opts);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+  }
+
+  function getAccessToken(options) {
+    options = options || {};
+    if (state.accessToken && Date.now() < state.tokenExpiresAt - TOKEN_EXPIRY_BUFFER_MS) {
+      return Promise.resolve(state.accessToken);
+    }
+    return requestToken(!!options.interactive);
+  }
+
+  function fetchSignedInEmail(token) {
+    if (!fetchFn) return Promise.resolve(state.email);
+    return fetchFn(USERINFO_URL, {
+      headers: { Authorization: 'Bearer ' + token },
+      credentials: 'omit'
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = tryParseJson(text) || {};
+        if (data.email) {
+          state.email = data.email;
+          try { localStorage.setItem(EMAIL_HINT_KEY, data.email); } catch (err) { /* ignore */ }
+        }
+        return state.email;
+      });
+    }).catch(function () {
+      return state.email;
+    });
+  }
+
+  function apiRequest(url, opts, retried) {
+    opts = opts || {};
+    return getAccessToken().then(function (token) {
+      var headers = Object.assign({}, opts.headers || {}, {
+        Authorization: 'Bearer ' + token
+      });
+      if (opts.body && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+      }
+      return fetchFn(url, {
+        method: opts.method || 'GET',
+        headers: headers,
+        body: opts.body,
+        credentials: 'omit'
+      });
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = text ? tryParseJson(text) : {};
+        if (res.status === 401 && !retried) {
+          state.accessToken = '';
+          state.tokenExpiresAt = 0;
+          return getAccessToken({ interactive: false }).then(function () {
+            return apiRequest(url, opts, true);
+          });
+        }
+        if (!res.ok) throw sheetsError(data, res.status);
+        return data || {};
+      });
+    });
+  }
+
+  function getLiveClient() {
+    var settings = getSettings();
+    if (!state.client || state.client._spreadsheetId !== settings.spreadsheetId) {
+      state.client = createSheetClient({
+        spreadsheetId: settings.spreadsheetId,
+        rowMap: state.rowMap,
+        request: apiRequest
+      });
+      state.client._spreadsheetId = settings.spreadsheetId;
+    } else {
+      state.client.setRowMap(state.rowMap);
+    }
+    return state.client;
+  }
+
+  function demoList() {
+    var entries = readDemoEntries().filter(function (entry) {
+      return entry && entry.id;
+    });
+    entries.sort(compareEntries);
+    return { ok: true, entries: entries, rowMap: {} };
+  }
+
+  function demoCreate(body) {
+    var entry = {
+      id: uuid(),
+      date: validateDate(body.date),
+      description: validateDescription(body.description),
+      active: true,
+      createdAt: nowIso(),
+      updatedAt: nowIso()
+    };
+    var entries = readDemoEntries();
+    entries.push(entry);
+    writeDemoEntries(entries);
+    return { ok: true, entry: entry };
+  }
+
+  function demoUpdate(entry) {
+    var entries = readDemoEntries();
+    var index = findIndex(entries, entry.id);
+    if (index < 0) throw new Error('Entry not found');
+    var next = Object.assign({}, entries[index], entry, { updatedAt: nowIso() });
+    if (entry.date !== undefined) next.date = validateDate(next.date);
+    if (entry.description !== undefined) next.description = validateDescription(next.description);
+    entries[index] = next;
+    writeDemoEntries(entries);
+    return { ok: true, entry: next };
+  }
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function setModeLabel() {
+    var demo = isDemoMode();
+    var label = $('mode-label');
+    var demoBanner = $('demo-banner');
+    var signinBanner = $('signin-banner');
+    var authButton = $('auth-button');
+    if (demo) {
+      if (label) label.textContent = 'Demo mode';
+      if (demoBanner) demoBanner.hidden = false;
+      if (signinBanner) signinBanner.hidden = true;
+      if (authButton) authButton.hidden = true;
+      return;
+    }
+    if (demoBanner) demoBanner.hidden = true;
+    if (isSignedIn() || state.email) {
+      if (label) label.textContent = state.email ? ('Signed in as ' + state.email) : 'Signed in';
+      if (signinBanner) signinBanner.hidden = true;
+      if (authButton) {
+        authButton.hidden = false;
+        authButton.textContent = 'Sign out';
+      }
+    } else {
+      if (label) label.textContent = 'Not signed in';
+      if (signinBanner) signinBanner.hidden = false;
+      if (authButton) {
+        authButton.hidden = false;
+        authButton.textContent = 'Sign in';
+      }
+    }
+  }
+
+  function showError(message) {
+    state.error = message || '';
+    var el = $('error-banner');
+    if (!el) return;
+    if (!state.error) {
+      el.hidden = true;
+      el.textContent = '';
+      return;
+    }
+    el.hidden = false;
+    el.textContent = '';
+    el.appendChild(document.createTextNode(state.error + ' '));
+    var retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'link';
+    retry.textContent = 'Retry';
+    retry.addEventListener('click', function () { refresh({ interactive: true }); });
+    el.appendChild(retry);
+  }
+
+  function visibleEntries() {
+    if (isShowInactive()) return state.entries.slice();
+    return state.entries.filter(function (entry) { return entry.active; });
+  }
+
+  function isShowInactive() {
+    var box = $('show-inactive');
+    if (box) return !!box.checked;
+    try {
+      return localStorage.getItem(SHOW_INACTIVE_KEY) === 'true';
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function renderList() {
+    var root = $('entry-list');
+    if (!root) return;
+    root.textContent = '';
+    var entries = visibleEntries();
+    if (state.loading && !state.entries.length) {
+      var loading = document.createElement('div');
+      loading.className = 'loading';
+      loading.textContent = 'Loading entries…';
+      root.appendChild(loading);
+      return;
+    }
+    if (!entries.length && !state.error) {
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      if (!isDemoMode() && !isSignedIn() && !state.entries.length) {
+        empty.textContent = 'Sign in to load entries from the Google Sheet.';
+      } else {
+        empty.textContent = isShowInactive()
+          ? 'No entries yet.'
+          : 'No active entries. Add one above, or turn on “Show inactive” to see deleted items.';
+      }
+      root.appendChild(empty);
+      return;
+    }
+    entries.forEach(function (entry) {
+      root.appendChild(renderEntry(entry));
+    });
+  }
+
+  function renderEntry(entry) {
+    var card = document.createElement('article');
+    card.className = 'entry' + (entry.active ? '' : ' inactive') + (entry.syncing ? ' syncing' : '');
+    card.dataset.id = entry.id;
+
+    var when = document.createElement('div');
+    when.className = 'when';
+    when.textContent = formatDisplayDate(entry.date);
+    card.appendChild(when);
+
+    var desc = document.createElement('p');
+    desc.className = 'desc';
+    desc.textContent = entry.description;
+    card.appendChild(desc);
+
+    if (!entry.active) {
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = 'Inactive (soft-deleted)';
+      card.appendChild(meta);
+    }
+    if (entry.syncing) {
+      var badge = document.createElement('div');
+      badge.className = 'sync-badge';
+      badge.textContent = 'Saving…';
+      card.appendChild(badge);
+    }
+
+    var actions = document.createElement('div');
+    actions.className = 'row-actions';
+    if (entry.active) {
+      actions.appendChild(actionButton('Edit', function () { beginEdit(card, entry); }));
+      actions.appendChild(actionButton('Delete', function () { softDelete(entry); }, 'danger'));
+    } else {
+      actions.appendChild(actionButton('Restore', function () { restoreEntry(entry.id); }));
+    }
+    card.appendChild(actions);
+    return card;
+  }
+
+  function actionButton(label, onClick, extraClass) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-text' + (extraClass ? ' ' + extraClass : '');
+    btn.textContent = label;
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function setEntryState(nextEntries, rowMap) {
+    state.entries = (nextEntries || []).slice().sort(compareEntries);
+    if (rowMap) state.rowMap = rowMap;
+    if (!isDemoMode()) {
+      writeCache(getSettings().spreadsheetId, state.entries, state.rowMap);
+    }
+    renderList();
+  }
+
+  function patchEntry(id, fields) {
+    var next = upsertEntry(state.entries, Object.assign({}, findLocal(id) || { id: id }, fields));
+    setEntryState(next, state.rowMap);
+    return findLocal(id);
+  }
+
+  function findLocal(id) {
+    var index = findIndex(state.entries, id);
+    return index < 0 ? null : state.entries[index];
+  }
+
+  function friendlyError(err) {
+    var message = String((err && err.message) || err || 'Something went wrong');
+    if (/popup_closed|popup_closed_by_user/i.test(message)) {
+      return 'Sign-in was cancelled.';
+    }
+    if (/access_denied/i.test(message)) {
+      return 'Access was denied. If the consent screen is in Testing mode, add this Google account as a test user.';
+    }
+    if (/immediate_failed|popup_failed|Failed to open/i.test(message)) {
+      return 'Could not complete sign-in automatically. Click Sign in and allow the Google popup.';
+    }
+    if (/Failed to fetch|NetworkError|Load failed|TypeError/i.test(message)) {
+      return 'Could not reach Google Sheets. Check your network, and that the Google Sheets API is enabled in your Google Cloud project.';
+    }
+    if (/has not been used in project|is disabled/i.test(message)) {
+      return 'The Google Sheets API is not enabled for this OAuth client’s Cloud project. Enable it, then try again.';
+    }
+    if ((err && (err.status === 403 || err.statusCode === 403)) || /PERMISSION_DENIED|insufficient/i.test(message)) {
+      return 'This Google account cannot access the spreadsheet, or the Sheets API is not enabled. Share the sheet with the signed-in account and check the Cloud project.';
+    }
+    if ((err && (err.status === 404 || err.statusCode === 404)) || /Requested entity was not found/i.test(message)) {
+      return 'Spreadsheet not found. Check the spreadsheet ID and that the Entries tab exists.';
+    }
+    return message;
+  }
+
+  function showToast(message, actionLabel, onAction, isError) {
+    var wrap = $('toast-wrap');
+    var toast = $('toast');
+    var msg = $('toast-message');
+    var action = $('toast-action');
+    if (msg) msg.textContent = message;
+    if (toast) toast.className = 'toast' + (isError ? ' error' : '');
+    if (action) {
+      if (actionLabel && onAction) {
+        action.hidden = false;
+        action.textContent = actionLabel;
+        state.undo = onAction;
+      } else {
+        action.hidden = true;
+        state.undo = null;
+      }
+    }
+    if (wrap) wrap.hidden = false;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, isError ? 6000 : 8000);
+  }
+
+  function hideToast() {
+    var wrap = $('toast-wrap');
+    if (wrap) wrap.hidden = true;
+    state.undo = null;
+    if (toastTimer) {
+      clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+  }
+
+  function showErrorToast(err) {
+    showToast(friendlyError(err), 'Dismiss', hideToast, true);
+  }
+
+  function enqueue(id, work) {
+    var gen = (opGens[id] || 0) + 1;
+    opGens[id] = gen;
+    var prev = opChains[id] || Promise.resolve();
+    var next = prev.then(function () {
+      if (opGens[id] !== gen) return null;
+      return work(gen);
+    }, function () {
+      if (opGens[id] !== gen) return null;
+      return work(gen);
+    });
+    opChains[id] = next.then(function () {}, function () {});
+    return next;
+  }
+
+  function shouldUpdateExisting(entry, snapshot) {
+    return !!(state.rowMap[String(entry.id)] || (snapshot && findIndex(snapshot, entry.id) >= 0));
+  }
+
+  function persistLive(entry, snapshot, gen) {
+    var client = getLiveClient();
+    var write = shouldUpdateExisting(entry, snapshot) ? client.update(entry) : client.create(entry);
+    return write.then(function (result) {
+      if (result && result.row) state.rowMap[String(entry.id)] = result.row;
+      else state.rowMap = Object.assign({}, state.rowMap, client.getRowMap());
+      if (opGens[entry.id] !== gen) return;
+      patchEntry(entry.id, { syncing: false });
+    }).catch(function (err) {
+      if (opGens[entry.id] !== gen) throw err;
+      if (snapshot) setEntryState(rollbackEntries(snapshot), state.rowMap);
+      else setEntryState(removeEntry(state.entries, entry.id), state.rowMap);
+      showErrorToast(err);
+      throw err;
+    });
+  }
+
+  function persistDemo(entry, snapshot) {
+    return Promise.resolve().then(function () {
+      var entries = state.entries.map(function (item) {
+        var copy = Object.assign({}, item);
+        delete copy.syncing;
+        return copy;
+      });
+      writeDemoEntries(entries);
+      patchEntry(entry.id, { syncing: false });
+    }).catch(function (err) {
+      if (snapshot) setEntryState(rollbackEntries(snapshot), {});
+      else setEntryState(removeEntry(state.entries, entry.id), {});
+      showErrorToast(err);
+      throw err;
+    });
+  }
+
+  function persistEntry(entry, snapshot, gen) {
+    var clean = cloneEntry(entry);
+    delete clean.syncing;
+    if (isDemoMode()) return persistDemo(clean, snapshot);
+    if (!isSignedIn() && !(state.accessToken && Date.now() < state.tokenExpiresAt + 5000)) {
+      return getAccessToken({ interactive: true }).then(function (token) {
+        return fetchSignedInEmail(token).then(function () {
+          setModeLabel();
+          return persistLive(clean, snapshot, gen);
+        });
+      }).catch(function (err) {
+        if (opGens[entry.id] !== gen) throw err;
+        if (snapshot) setEntryState(rollbackEntries(snapshot), state.rowMap);
+        else setEntryState(removeEntry(state.entries, entry.id), state.rowMap);
+        showErrorToast(err);
+        throw err;
+      });
+    }
+    return persistLive(clean, snapshot, gen);
+  }
+
+  function beginEdit(card, entry) {
+    if (entry.syncing) return;
+    card.textContent = '';
+    var dateLabel = document.createElement('label');
+    dateLabel.className = 'field';
+    dateLabel.innerHTML = '<span>Date</span>';
+    var dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.value = entry.date;
+    dateInput.required = true;
+    dateLabel.appendChild(dateInput);
+
+    var descLabel = document.createElement('label');
+    descLabel.className = 'field';
+    descLabel.innerHTML = '<span>Description</span>';
+    var descInput = document.createElement('textarea');
+    descInput.required = true;
+    descInput.maxLength = 2000;
+    descInput.value = entry.description;
+    descLabel.appendChild(descInput);
+
+    var actions = document.createElement('div');
+    actions.className = 'actions';
+    var save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'btn btn-primary';
+    save.textContent = 'Save';
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn btn-ghost';
+    cancel.textContent = 'Cancel';
+    actions.appendChild(save);
+    actions.appendChild(cancel);
+
+    card.appendChild(dateLabel);
+    card.appendChild(descLabel);
+    card.appendChild(actions);
+
+    cancel.addEventListener('click', function () { renderList(); });
+    save.addEventListener('click', function () {
+      try {
+        var next = Object.assign(cloneEntry(entry), {
+          date: validateDate(dateInput.value),
+          description: validateDescription(descInput.value),
+          updatedAt: nowIso(),
+          syncing: true
+        });
+        var applied = applyOptimistic(state.entries, next);
+        setEntryState(applied.entries, state.rowMap);
+        enqueue(entry.id, function (gen) {
+          return persistEntry(next, applied.rollback, gen);
+        });
+      } catch (err) {
+        showError(friendlyError(err));
+      }
+    });
+    descInput.focus();
+  }
+
+  function softDelete(entry) {
+    var next = Object.assign(cloneEntry(entry), {
+      active: false,
+      updatedAt: nowIso(),
+      syncing: true
+    });
+    var applied = applyOptimistic(state.entries, next);
+    setEntryState(applied.entries, state.rowMap);
+    showToast('Entry deleted', 'Undo', function () { restoreEntry(entry.id); });
+    return enqueue(entry.id, function (gen) {
+      return persistEntry(next, applied.rollback, gen);
+    });
+  }
+
+  function restoreEntry(id) {
+    hideToast();
+    var current = findLocal(id);
+    if (!current) return Promise.resolve();
+    var next = Object.assign(cloneEntry(current), {
+      active: true,
+      updatedAt: nowIso(),
+      syncing: true
+    });
+    var applied = applyOptimistic(state.entries, next);
+    setEntryState(applied.entries, state.rowMap);
+    return enqueue(id, function (gen) {
+      return persistEntry(next, applied.rollback, gen);
+    });
+  }
+
+  function createEntry(date, description) {
+    var entry = {
+      id: uuid(),
+      date: validateDate(date),
+      description: validateDescription(description),
+      active: true,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+      syncing: true
+    };
+    var applied = applyOptimistic(state.entries, entry);
+    setEntryState(applied.entries, state.rowMap);
+    return enqueue(entry.id, function (gen) {
+      return persistEntry(entry, null, gen);
+    });
+  }
+
+  function fillAddForm() {
+    var date = $('add-date');
+    var desc = $('add-description');
+    if (date) date.value = todayLocal();
+    if (desc) desc.value = '';
+  }
+
+  function refresh(options) {
+    options = options || {};
+    showError('');
+    if (isDemoMode()) {
+      state.loading = !state.entries.length;
+      renderList();
+      return Promise.resolve().then(function () {
+        var result = demoList();
+        state.loading = false;
+        setEntryState(result.entries, {});
+      });
+    }
+    if (!isSignedIn() && !options.interactive) {
+      var cache = readCache(getSettings().spreadsheetId);
+      if (cache && !state.entries.length) {
+        setEntryState(cache.entries, cache.rowMap || {});
+      } else {
+        renderList();
+      }
+      setModeLabel();
+      return Promise.resolve();
+    }
+    state.loading = !state.entries.length;
+    renderList();
+    return getAccessToken({ interactive: !!options.interactive }).then(function (token) {
+      return fetchSignedInEmail(token).then(function () {
+        setModeLabel();
+        return getLiveClient().list();
+      });
+    }).then(function (result) {
+      state.loading = false;
+      setEntryState(result.entries, result.rowMap || {});
+    }).catch(function (err) {
+      state.loading = false;
+      setModeLabel();
+      showError(friendlyError(err));
+      renderList();
+    });
+  }
+
+  function signIn() {
+    showError('');
+    return getAccessToken({ interactive: true }).then(function (token) {
+      return fetchSignedInEmail(token);
+    }).then(function () {
+      setModeLabel();
+      return refresh();
+    }).catch(function (err) {
+      setModeLabel();
+      showError(friendlyError(err));
+    });
+  }
+
+  function signOut() {
+    var token = state.accessToken;
+    state.accessToken = '';
+    state.tokenExpiresAt = 0;
+    state.email = '';
+    state.client = null;
+    try { localStorage.removeItem(EMAIL_HINT_KEY); } catch (err) { /* ignore */ }
+    clearCache();
+    state.entries = [];
+    state.rowMap = {};
+    if (token && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2 && typeof google.accounts.oauth2.revoke === 'function') {
+      try { google.accounts.oauth2.revoke(token, function () {}); } catch (err) { /* ignore */ }
+    }
+    setModeLabel();
+    showError('');
+    renderList();
+  }
+
+  function trySilentSignIn() {
+    var hint = '';
+    try { hint = localStorage.getItem(EMAIL_HINT_KEY) || ''; } catch (err) { hint = ''; }
+    if (!hint || isDemoMode()) return Promise.resolve();
+    return getAccessToken({ interactive: false }).then(function (token) {
+      return fetchSignedInEmail(token);
+    }).then(function () {
+      setModeLabel();
+      return refresh();
+    }).catch(function () {
+      setModeLabel();
+      return null;
+    });
+  }
+
+  function openSettings() {
+    var settings = getSettings();
+    var stored = {};
+    try {
+      stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {};
+    } catch (err) {
+      stored = {};
+    }
+    if ($('settings-client-id')) {
+      $('settings-client-id').value = stored.clientId || settings.clientId || '';
+    }
+    if ($('settings-spreadsheet-id')) {
+      $('settings-spreadsheet-id').value = stored.spreadsheetId || settings.spreadsheetId || '';
+    }
+    var overlay = $('settings-overlay');
+    if (overlay) overlay.hidden = false;
+  }
+
+  function closeSettings() {
+    var overlay = $('settings-overlay');
+    if (overlay) overlay.hidden = true;
+  }
+
+  function init() {
+    setModeLabel();
+    fillAddForm();
+
+    var showInactive = $('show-inactive');
+    if (showInactive) {
+      try {
+        showInactive.checked = localStorage.getItem(SHOW_INACTIVE_KEY) === 'true';
+      } catch (err) {
+        showInactive.checked = false;
+      }
+      showInactive.addEventListener('change', function () {
+        try {
+          localStorage.setItem(SHOW_INACTIVE_KEY, showInactive.checked ? 'true' : 'false');
+        } catch (err) { /* ignore */ }
+        renderList();
+      });
+    }
+
+    if (!isDemoMode()) {
+      var cache = readCache(getSettings().spreadsheetId);
+      if (cache) {
+        state.entries = (cache.entries || []).slice().sort(compareEntries);
+        state.rowMap = cache.rowMap || {};
+        renderList();
+      }
+    }
+
+    var addForm = $('add-form');
+    if (addForm) {
+      addForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var date = $('add-date') && $('add-date').value;
+        var description = $('add-description') && $('add-description').value;
+        showError('');
+        try {
+          createEntry(date, description);
+          fillAddForm();
+        } catch (err) {
+          showError(friendlyError(err));
+        }
+      });
+    }
+
+    $('open-settings') && $('open-settings').addEventListener('click', openSettings);
+    $('close-settings') && $('close-settings').addEventListener('click', closeSettings);
+    $('settings-overlay') && $('settings-overlay').addEventListener('click', function (event) {
+      if (event.target === $('settings-overlay')) closeSettings();
+    });
+    $('settings-form') && $('settings-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      saveSettings({
+        clientId: $('settings-client-id') && $('settings-client-id').value,
+        spreadsheetId: $('settings-spreadsheet-id') && $('settings-spreadsheet-id').value,
+        forceDemo: false
+      });
+      closeSettings();
+      state.client = null;
+      state.entries = [];
+      state.rowMap = {};
+      setModeLabel();
+      if (isDemoMode()) {
+        refresh();
+      } else {
+        var cache = readCache(getSettings().spreadsheetId);
+        if (cache) setEntryState(cache.entries, cache.rowMap || {});
+        if (isSignedIn()) refresh();
+        else {
+          setModeLabel();
+          renderList();
+          trySilentSignIn();
+        }
+      }
+    });
+    $('use-demo') && $('use-demo').addEventListener('click', function () {
+      var current = getSettings();
+      var storedClient = $('settings-client-id') && $('settings-client-id').value;
+      var storedSheet = $('settings-spreadsheet-id') && $('settings-spreadsheet-id').value;
+      saveSettings({
+        clientId: storedClient != null ? storedClient : current.clientId,
+        spreadsheetId: storedSheet != null ? storedSheet : current.spreadsheetId,
+        forceDemo: true
+      });
+      closeSettings();
+      state.client = null;
+      state.entries = [];
+      state.rowMap = {};
+      setModeLabel();
+      refresh();
+    });
+    $('toast-action') && $('toast-action').addEventListener('click', function () {
+      if (typeof state.undo === 'function') state.undo();
+    });
+    function handleAuthClick() {
+      if (isSignedIn() || state.email) signOut();
+      else signIn();
+    }
+    $('auth-button') && $('auth-button').addEventListener('click', handleAuthClick);
+    $('signin-banner-button') && $('signin-banner-button').addEventListener('click', signIn);
+
+    if (isDemoMode()) {
+      refresh();
+    } else {
+      setModeLabel();
+      renderList();
+      trySilentSignIn();
+    }
+  }
+
+  var TimesheetApp = {
+    DEFAULT_CLIENT_ID: DEFAULT_CLIENT_ID,
+    DEFAULT_SPREADSHEET_ID: DEFAULT_SPREADSHEET_ID,
+    SCOPE: SCOPE,
+    SHEET_NAME: SHEET_NAME,
+    HEADERS: HEADERS,
+    todayLocal: todayLocal,
+    nowIso: nowIso,
+    uuid: uuid,
+    validateDate: validateDate,
+    validateDescription: validateDescription,
+    formatDisplayDate: formatDisplayDate,
+    compareEntries: compareEntries,
+    parseSpreadsheetId: parseSpreadsheetId,
+    getSettings: getSettings,
+    saveSettings: saveSettings,
+    isDemoMode: isDemoMode,
+    isConfigured: isConfigured,
+    seedDemoEntries: seedDemoEntries,
+    readDemoEntries: readDemoEntries,
+    writeDemoEntries: writeDemoEntries,
+    resetDemoData: function () {
+      try { localStorage.removeItem(DEMO_KEY); } catch (err) { /* ignore */ }
+    },
+    serialToIsoDate: serialToIsoDate,
+    parseCellDate: parseCellDate,
+    parseCellActive: parseCellActive,
+    parseCellTimestamp: parseCellTimestamp,
+    rowToEntry: rowToEntry,
+    entryToRowValues: entryToRowValues,
+    parseSheetValues: parseSheetValues,
+    parseUpdatedRange: parseUpdatedRange,
+    valuesUrl: valuesUrl,
+    upsertEntry: upsertEntry,
+    removeEntry: removeEntry,
+    applyOptimistic: applyOptimistic,
+    rollbackEntries: rollbackEntries,
+    createSheetClient: createSheetClient,
+    setFetch: function (fn) { fetchFn = fn; },
+    getState: function () { return state; }
+  };
+
+  if (typeof window !== 'undefined') window.TimesheetApp = TimesheetApp;
+  if (typeof globalThis !== 'undefined') globalThis.TimesheetApp = TimesheetApp;
+
+  if (typeof document !== 'undefined' && document.getElementById('entry-list')) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  }
+})();
+  </script>
+</body>
+</html>
